@@ -20,5 +20,6 @@ export type DetermineActionFn = (
     emoji?: string,
     todos?: TodoItem[],
     model?: Model,
-    timezone?: string
+    timezone?: string,
+    apiKey?: string
 ) => Promise<DetermineActionResponse>; 

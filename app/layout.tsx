@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -55,6 +54,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
         suppressHydrationWarning
@@ -68,7 +70,6 @@ export default function RootLayout({
           <InstallPrompt />
           {children}
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   );

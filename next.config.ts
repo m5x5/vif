@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactCompiler: true,
+  productionBrowserSourceMaps: true,
   experimental: {
     optimizePackageImports: ["@phosphor-icons/react"],
     serverActions: {

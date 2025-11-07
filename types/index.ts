@@ -5,6 +5,7 @@ export interface TodoItem {
   emoji?: string;
   date: Date;
   time?: string; // Optional time in HH:mm format
+  removed?: boolean; // Mark as removed instead of deleting
 }
 
 export type SortOption = "newest" | "oldest" | "alphabetical" | "completed";

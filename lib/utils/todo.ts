@@ -33,7 +33,7 @@ export const formatDate = (date: Date) => {
 // Filter todos by date
 export const filterTodosByDate = (todos: TodoItem[], selectedDate: Date) => {
   return todos.filter(
-    (todo) => format(todo.date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd")
+    (todo) => !todo.removed && format(todo.date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd")
   );
 };
 

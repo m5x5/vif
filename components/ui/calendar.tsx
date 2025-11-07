@@ -19,9 +19,11 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  datesWithTodos,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+  datesWithTodos?: Set<string>
 }) {
   const defaultClassNames = getDefaultClassNames()
 
@@ -152,7 +154,7 @@ function Calendar({
             <ChevronDownIcon className={cn("size-4", className)} {...props} />
           )
         },
-        DayButton: CalendarDayButton,
+        DayButton: (props) => <CalendarDayButton {...props} datesWithTodos={datesWithTodos} />,
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>
@@ -173,14 +175,24 @@ function CalendarDayButton({
   className,
   day,
   modifiers,
+  datesWithTodos,
   ...props
-}: React.ComponentProps<typeof DayButton>) {
+}: React.ComponentProps<typeof DayButton> & {
+  datesWithTodos?: Set<string>
+}) {
   const defaultClassNames = getDefaultClassNames()
 
   const ref = React.useRef<HTMLButtonElement>(null)
   React.useEffect(() => {
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
+
+  // Format date in local timezone to match the format used in todos
+  const year = day.date.getFullYear()
+  const month = String(day.date.getMonth() + 1).padStart(2, '0')
+  const dayNum = String(day.date.getDate()).padStart(2, '0')
+  const dateString = `${year}-${month}-${dayNum}`
+  const hasTodos = datesWithTodos?.has(dateString)
 
   return (
     <Button
@@ -203,7 +215,12 @@ function CalendarDayButton({
         className
       )}
       {...props}
-    />
+    >
+      <span>{day.date.getDate()}</span>
+      {hasTodos && (
+        <div className="w-1 h-1 rounded-full bg-primary absolute bottom-1" />
+      )}
+    </Button>
   )
 }
 

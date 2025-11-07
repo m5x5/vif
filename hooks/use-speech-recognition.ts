@@ -1,7 +1,10 @@
-import { useState, useCallback } from 'react';
-import { convertSpeechToText } from '@/app/actions';
+'use client';
 
-export function useSpeechRecognition() {
+import { useState, useCallback } from 'react';
+import { experimental_transcribe as transcribe } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+
+export function useSpeechRecognition(apiKey: string = "") {
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
@@ -165,31 +168,24 @@ export function useSpeechRecognition() {
         size: audioBlob.size
       });
 
-      // Create a file with the appropriate extension based on MIME type
-      let filename = "recording.webm";
-      let fileType = audioBlob.type || "audio/webm";
-
-      if (fileType.includes("mp4")) {
-        filename = "recording.mp4";
-      } else if (fileType.includes("ogg")) {
-        filename = "recording.ogg";
-      } else if (fileType.includes("wav")) {
-        filename = "recording.wav";
+      if (!apiKey) {
+        console.error("No API key provided for transcription");
+        alert("Please configure your API key first.");
+        return null;
       }
 
-      // Create File object to be serialized over the network
-      const audioFile = new File([audioBlob], filename, {
-        type: fileType
+      // Create OpenAI client with user's API key
+      const openai = createOpenAI({
+        apiKey: apiKey,
+        baseURL: "https://api.openai.com/v1"
       });
 
-      console.log("Audio file prepared:", {
-        name: audioFile.name,
-        type: audioFile.type,
-        size: audioFile.size
+      // Transcribe directly on the client side
+      const { text } = await transcribe({
+        model: openai.transcription("whisper-1"),
+        audio: await audioBlob.arrayBuffer(),
       });
 
-      // Call the server action with the File object
-      const text = await convertSpeechToText(audioFile);
       console.log("Got text response:", text);
 
       return text || null;

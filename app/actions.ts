@@ -1,16 +1,17 @@
-"use server";
+'use client';
 
-import { generateObject, experimental_transcribe as transcribe } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { vif } from "@/lib/models";
-import { elevenlabs } from '@ai-sdk/elevenlabs';
 import { DetermineActionFn } from "@/types/actions";
+import { createOpenAI } from "@ai-sdk/openai";
 
-export const determineAction: DetermineActionFn = async (text, emoji, todos, model = "vif-default", timezone = "UTC") => {
+export const determineAction: DetermineActionFn = async (text, emoji, todos, model = "vif-default", timezone = "UTC", apiKey = "") => {
     console.log("Determining action...");
     console.log(text, emoji, todos);
     console.log("Model:", model);
     console.log("Timezone:", timezone);
+    console.log("API Key:", apiKey);
 
     // Create dates in the user's timezone using a more reliable method
     function getDateInTimezone(timezone: string) {
@@ -146,14 +147,26 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
 
     console.log("prompt", prompt);
     const startTime = Date.now();
+
+    // Map model names to actual model identifiers
+    const modelMap: Record<string, string> = {
+        "vif-openai": "gpt-4o-mini",
+        "vif-claude": "claude-4-sonnet-20250514",
+        "vif-default": "grok-3-mini-fast",
+        "vif-qwen": "qwen-qwq-32b",
+        "vif-r1": "accounts/fireworks/models/deepseek-r1-0528"
+    };
+
+    const actualModel = modelMap[model] || "gpt-4o-mini";
+
+    const openai = createOpenAI({
+        apiKey: apiKey,
+        baseURL: "https://api.openai.com/v1"
+    });
+
     const { object: action, usage } = await generateObject({
-        model: vif.languageModel(model),
+        model: openai.languageModel(actualModel),
         temperature: 0,
-        providerOptions: {
-            groq: {
-                "service_tier": "auto",
-            }
-        },
         schema: z.object({
             actions: z.array(z.object({
                 action: z.enum(["add", "delete", "mark", "sort", "edit", "clear",]).describe("The action to take"),
@@ -177,26 +190,4 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
     console.log(action);
     console.log("usage", usage);
     return action;
-}
-
-export async function convertSpeechToText(audioFile: any) {
-    "use server";
-
-    if (!audioFile) {
-        throw new Error("No audio file provided");
-    }
-
-    console.log("Processing audio file:", {
-        type: audioFile.type,
-        size: audioFile.size,
-        name: audioFile.name || "unnamed"
-    });
-
-    const { text } = await transcribe({
-        model: elevenlabs.transcription("scribe_v1"),
-        audio: await audioFile.arrayBuffer(),
-    });
-
-    console.log("Transcribed text:", text);
-    return text;
 }
