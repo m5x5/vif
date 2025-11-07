@@ -7,7 +7,8 @@ import { serializeTodo } from '@/lib/utils/todo';
 
 interface TodonnaItem {
   todo_item_text: string;
-  completed?: boolean;
+  todo_item_status?: "pending" | "done" | "archived";
+  completed?: boolean; // Legacy field for migration
   emoji?: string;
   date?: string;
   time?: string;
@@ -26,7 +27,6 @@ export function useTodonna(remoteStorage: RemoteStorage | null) {
 
   // Load todos from RemoteStorage
   const loadTodos = useCallback(async () => {
-    console.timeEnd('Time to todos');
     console.time('loadTodos');
     if (!remoteStorage || loadingRef.current) return;
 
@@ -65,10 +65,19 @@ export function useTodonna(remoteStorage: RemoteStorage | null) {
             const todonnaItem = itemValue as TodonnaItem;
             const id = filename.replace('.json', '');
 
+            // Handle migration from old 'completed' boolean to new 'todo_item_status'
+            let status: "pending" | "done" | "archived" = "pending";
+            if (todonnaItem.todo_item_status) {
+              status = todonnaItem.todo_item_status;
+            } else if (todonnaItem.completed === true) {
+              // Migration: convert old completed boolean to new status
+              status = "done";
+            }
+            
             return serializeTodo({
               id,
               text: todonnaItem.todo_item_text,
-              completed: todonnaItem.completed || false,
+              todo_item_status: status,
               emoji: todonnaItem.emoji,
               date: todonnaItem.date ? new Date(todonnaItem.date) : new Date(),
               time: todonnaItem.time,
@@ -146,7 +155,7 @@ export function useTodonna(remoteStorage: RemoteStorage | null) {
 
       const todonnaItem: TodonnaItem = {
         todo_item_text: todo.text,
-        completed: todo.completed,
+        todo_item_status: todo.todo_item_status,
         emoji: todo.emoji,
         date: todo.date instanceof Date ? todo.date.toISOString() : todo.date,
         time: todo.time,
@@ -184,7 +193,7 @@ export function useTodonna(remoteStorage: RemoteStorage | null) {
 
       const todonnaItem: TodonnaItem = {
         todo_item_text: todo.text,
-        completed: todo.completed,
+        todo_item_status: todo.todo_item_status,
         emoji: todo.emoji,
         date: todo.date instanceof Date ? todo.date.toISOString() : todo.date,
         time: todo.time,

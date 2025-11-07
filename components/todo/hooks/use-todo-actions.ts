@@ -39,8 +39,8 @@ export function useTodoActions({
     return format(todo.date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
   };
 
-  // Helper: Generate unique ID
-  const generateTodoId = () => Math.random().toString(36).substring(7);
+  // Helper: Generate unique ID (must start with "id")
+  const generateTodoId = () => `id${Math.random().toString(36).substring(2)}`;
 
   // Helper: Create a new todo
   const createTodo = (
@@ -52,7 +52,7 @@ export function useTodoActions({
     return serializeTodo({
       id: generateTodoId(),
       text,
-      completed: false,
+      todo_item_status: "pending",
       emoji,
       date,
       time,
@@ -140,7 +140,7 @@ export function useTodoActions({
         // Use Todonna module API
         await remoteStorage.todonna.update(todo.id, {
           text: todo.text,
-          completed: todo.completed,
+          todo_item_status: todo.todo_item_status,
           emoji: todo.emoji,
           date: todo.date,
           time: todo.time,
@@ -182,7 +182,9 @@ export function useTodoActions({
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
       if (todo) {
-        updateTodo({ ...todo, completed: !todo.completed });
+        // Toggle between pending and done
+        const newStatus = todo.todo_item_status === "done" ? "pending" : "done";
+        updateTodo({ ...todo, todo_item_status: newStatus });
       }
     },
     [todos, updateTodo]
@@ -343,12 +345,16 @@ export function useTodoActions({
                 todo.id === action.todoId
                   ? {
                       ...todo,
-                      completed:
-                        action.status === "complete"
-                          ? true
-                          : action.status === "incomplete"
-                          ? false
-                          : !todo.completed,
+                      todo_item_status:
+                        action.status === "done"
+                          ? "done"
+                          : action.status === "pending"
+                          ? "pending"
+                          : action.status === "archived"
+                          ? "archived"
+                          : todo.todo_item_status === "done"
+                          ? "pending"
+                          : "done",
                     }
                   : todo
               );
@@ -371,7 +377,7 @@ export function useTodoActions({
                   emoji: action.emoji || todo.emoji,
                   date: action.targetDate ? new Date(action.targetDate) : todo.date,
                   time: action.time || todo.time,
-                  completed: action.status === "complete",
+                  todo_item_status: action.status || todo.todo_item_status,
                 });
                 await updateTodo(updated);
               }
@@ -381,9 +387,9 @@ export function useTodoActions({
           case "clear":
             if (action.listToClear === "all") {
               await clearAllTodos();
-            } else if (action.listToClear === "completed") {
+            } else if (action.listToClear === "done") {
               await clearCompletedTodos();
-            } else if (action.listToClear === "incomplete") {
+            } else if (action.listToClear === "pending") {
               await clearIncompleteTodos();
             }
             break;

@@ -10,8 +10,8 @@ export type DetermineActionResponse = {
         targetDate?: string;
         time?: string; // Optional time in HH:mm format
         sortBy?: "newest" | "oldest" | "alphabetical" | "completed";
-        status?: "complete" | "incomplete";
-        listToClear?: "all" | "completed" | "incomplete";
+        status?: "done" | "pending" | "archived";
+        listToClear?: "all" | "done" | "pending";
     }>;
 };
 

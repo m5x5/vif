@@ -49,10 +49,12 @@ export type { TodoItem } from '@/types';
  * @see https://github.com/remotestorage/modules/tree/master/todonna
  */
 interface TodonnaItem {
+  /** The todo item ID */
+  todo_item_id?: string;
   /** The todo text */
   todo_item_text: string;
-  /** Whether the todo is completed */
-  completed?: boolean;
+  /** The status of the todo item */
+  todo_item_status?: "pending" | "done" | "archived";
   /** Optional emoji icon */
   emoji?: string;
   /** ISO date string for the target date */
@@ -108,14 +110,19 @@ export const Todonna: RSModule = {
     privateClient.declareType('todonna-item', {
       type: 'object',
       properties: {
+        todo_item_id: {
+          type: 'string',
+          description: 'The unique identifier for the todo item',
+        },
         todo_item_text: {
           type: 'string',
           description: 'The text content of the todo item',
         },
-        completed: {
-          type: 'boolean',
-          default: false,
-          description: 'Whether the todo is completed',
+        todo_item_status: {
+          type: 'string',
+          enum: ['pending', 'done', 'archived'],
+          default: 'pending',
+          description: 'The status of the todo item',
         },
         emoji: {
           type: 'string',
@@ -141,13 +148,19 @@ export const Todonna: RSModule = {
      */
     function toTodonnaItem(todo: TodoItem): TodonnaItem {
       const item: TodonnaItem = {
+        todo_item_id: todo.id,
         todo_item_text: todo.text,
       };
 
-      // Only include optional fields if they have values
-      if (todo.completed !== undefined) {
-        item.completed = todo.completed;
+      // Convert completed boolean to todo_item_status
+      // TodoItem uses 'completed' boolean, but Todonna uses 'todo_item_status'
+      if ('completed' in todo && todo.completed !== undefined) {
+        item.todo_item_status = todo.completed ? 'done' : 'pending';
+      } else if ('todo_item_status' in todo && todo.todo_item_status !== undefined) {
+        // Support both formats for backwards compatibility
+        item.todo_item_status = todo.todo_item_status;
       }
+
       if (todo.emoji !== undefined && todo.emoji !== '') {
         item.emoji = todo.emoji;
       }
@@ -165,22 +178,25 @@ export const Todonna: RSModule = {
      * Converts Todonna storage format to TodoItem
      */
     function fromTodonnaItem(id: string, item: TodonnaItem): TodoItem {
+      // Handle conversion from 'todo_item_status' to 'completed' boolean
+      // Todonna uses status strings, but TodoItem uses completed boolean
+      let completed = false;
+      if (item.todo_item_status) {
+        completed = item.todo_item_status === 'done';
+      } else if ('completed' in item && (item as any).completed === true) {
+        // Support legacy completed field
+        completed = true;
+      }
+      
       return {
-        id,
+        id: item.todo_item_id || id, // Use todo_item_id if present, otherwise fall back to filename-based id
         text: item.todo_item_text,
-        completed: item.completed || false,
+        todo_item_status: completed ? 'done' : 'pending',
         emoji: item.emoji,
         date: item.date ? new Date(item.date) : new Date(),
         time: item.time,
         removed: false,
       };
-    }
-
-    /**
-     * Gets the filename for a todo ID
-     */
-    function getFilename(id: string): string {
-      return `${id}.json`;
     }
 
     return {
@@ -204,9 +220,8 @@ export const Todonna: RSModule = {
          * ```
          */
         add: async function (todo: TodoItem): Promise<void> {
-          const filename = getFilename(todo.id);
           const item = toTodonnaItem(todo);
-          await privateClient.storeObject('todonna-item', filename, item);
+          await privateClient.storeObject('todonna-item', todo.id, item);
         },
 
         /**
@@ -228,8 +243,7 @@ export const Todonna: RSModule = {
           id: string,
           updates: Partial<Omit<TodoItem, 'id'>>
         ): Promise<void> {
-          const filename = getFilename(id);
-          const existing = await privateClient.getObject(filename);
+          const existing = await privateClient.getObject(id, 0);
 
           if (!existing || typeof existing !== 'object') {
             throw new Error(`Todo with id ${id} not found`);
@@ -239,7 +253,7 @@ export const Todonna: RSModule = {
           const updatedTodo = { ...currentTodo, ...updates, id };
           const item = toTodonnaItem(updatedTodo);
 
-          await privateClient.storeObject('todonna-item', filename, item);
+          await privateClient.storeObject('todonna-item', id, item);
         },
 
         /**
@@ -261,8 +275,7 @@ export const Todonna: RSModule = {
          * ```
          */
         remove: async function (id: string): Promise<void> {
-          const filename = getFilename(id);
-          await privateClient.remove(filename);
+          await privateClient.remove(id);
         },
 
         /**
@@ -284,8 +297,7 @@ export const Todonna: RSModule = {
           id: string,
           maxAge?: number
         ): Promise<TodoItem | null> {
-          const filename = getFilename(id);
-          const item = await privateClient.getObject(filename, maxAge);
+          const item = await privateClient.getObject(id, maxAge);
 
           if (!item || typeof item !== 'object' || !('todo_item_text' in item)) {
             return null;
@@ -335,8 +347,7 @@ export const Todonna: RSModule = {
                 typeof item === 'object' &&
                 'todo_item_text' in item
               ) {
-                const id = filename.replace('.json', '');
-                return fromTodonnaItem(id, item as TodonnaItem);
+                return fromTodonnaItem(filename, item as TodonnaItem);
               }
               return null;
             })
@@ -554,7 +565,7 @@ export const Todonna: RSModule = {
          */
         clearCompletedByDate: async function (date: Date): Promise<number> {
           const todos = await this.getByDate(date);
-          const completedIds = todos.filter((t: TodoItem) => t.completed).map((t: TodoItem) => t.id);
+          const completedIds = todos.filter((t: TodoItem) => t.todo_item_status === "done").map((t: TodoItem) => t.id);
           const result = await this.batchRemove(completedIds);
           return result.succeeded;
         },
@@ -575,7 +586,7 @@ export const Todonna: RSModule = {
         clearIncompleteByDate: async function (date: Date): Promise<number> {
           const todos = await this.getByDate(date);
           const incompleteIds = todos
-            .filter((t: TodoItem) => !t.completed)
+            .filter((t: TodoItem) => t.todo_item_status === "pending")
             .map((t: TodoItem) => t.id);
           const result = await this.batchRemove(incompleteIds);
           return result.succeeded;

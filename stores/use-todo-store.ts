@@ -191,7 +191,8 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
       // Use Todonna module API
       await remoteStorage.todonna.update(todo.id, {
         text: todo.text,
-        completed: todo.completed,
+        todo_item_id: todo.todo_item_id,
+        todo_item_status: todo.todo_item_status,
         emoji: todo.emoji,
         date: todo.date,
         time: todo.time,
@@ -201,7 +202,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
       // Log the action
       await logTodoAction(remoteStorage, LogActions.UPDATE_TODO, todo.id, {
         text: todo.text,
-        completed: todo.completed,
+        todo_item_status: todo.todo_item_status,
         emoji: todo.emoji,
         date: todo.date.toISOString(),
         time: todo.time,
@@ -249,11 +250,12 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     const { remoteStorage } = get();
     const todo = get().todos.find((t) => t.id === id);
     if (todo) {
-      const newCompleted = !todo.completed;
-      await get().updateTodo({ ...todo, completed: newCompleted });
+      // Toggle between pending and done
+      const newStatus = todo.todo_item_status === "done" ? "pending" : "done";
+      await get().updateTodo({ ...todo, todo_item_status: newStatus });
       // Log the toggle action
       await logTodoAction(remoteStorage, LogActions.TOGGLE_TODO, id, {
-        completed: newCompleted,
+        todo_item_status: newStatus,
         text: todo.text,
       });
     }
@@ -388,9 +390,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
               ? new Date(action.targetDate)
               : selectedDate;
             const newTodo = serializeTodo({
-              id: Math.random().toString(36).substring(7),
+              id: `id${Math.random().toString(36).substring(2)}`,
               text: action.text || text,
-              completed: false,
+              todo_item_status: "pending",
               emoji: action.emoji || emoji,
               date: todoDate,
               time: action.time,
@@ -410,12 +412,16 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
                 todo.id === action.todoId
                   ? {
                       ...todo,
-                      completed:
-                        action.status === 'complete'
-                          ? true
-                          : action.status === 'incomplete'
-                          ? false
-                          : !todo.completed,
+                      todo_item_status:
+                        action.status === 'done'
+                          ? 'done'
+                          : action.status === 'pending'
+                          ? 'pending'
+                          : action.status === 'archived'
+                          ? 'archived'
+                          : todo.todo_item_status === 'done'
+                          ? 'pending'
+                          : 'done',
                     }
                   : todo
               );
@@ -438,7 +444,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
                   emoji: action.emoji || todo.emoji,
                   date: action.targetDate ? new Date(action.targetDate) : todo.date,
                   time: action.time || todo.time,
-                  completed: action.status === 'complete' ? true : todo.completed,
+                  todo_item_status: action.status || todo.todo_item_status,
                 });
                 await get().updateTodo(updated);
               }
@@ -448,9 +454,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
           case 'clear':
             if (action.listToClear === 'all') {
               await get().clearAllTodos();
-            } else if (action.listToClear === 'completed') {
+            } else if (action.listToClear === 'done') {
               await get().clearCompletedTodos();
-            } else if (action.listToClear === 'incomplete') {
+            } else if (action.listToClear === 'pending') {
               await get().clearIncompleteTodos();
             }
             break;
@@ -475,9 +481,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
       });
       // Fallback: just add the todo as-is
       const fallbackTodo = serializeTodo({
-        id: Math.random().toString(36).substring(7),
+        id: `id${Math.random().toString(36).substring(2)}`,
         text,
-        completed: false,
+        todo_item_status: "pending",
         emoji,
         date: selectedDate,
       });

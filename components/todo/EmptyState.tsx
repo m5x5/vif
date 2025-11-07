@@ -21,7 +21,6 @@ export function EmptyState({ selectedDate, focusInput }: EmptyStateProps) {
             className="size-10 object-contain"
             priority
             unoptimized
-            quality={100}
           />
         </div>
       </div>

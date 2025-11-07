@@ -22,7 +22,7 @@ declare module 'remotestoragejs' {
      * await rs.todonna.add({
      *   id: 'abc123',
      *   text: 'Buy groceries',
-     *   completed: false,
+     *   todo_item_status: 'pending',
      *   date: new Date()
      * });
      * 

@@ -15,7 +15,6 @@ export function LoadingState() {
             className="w-7 h-7 object-contain"
             priority
             unoptimized
-            quality={100}
           />
           <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center">
             <MagicWand

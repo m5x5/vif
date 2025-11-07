@@ -109,10 +109,10 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
         The action should be one of the following: ${["add", "delete", "mark", "sort", "edit", "clear"].join(", ")}
         - If the action is "add", the text, emoji, and targetDate should be included.
         - If the action is "delete", the todoId should be included.
-        - If the action is "mark", the todoId should be included and the status should be "complete" or "incomplete".
+        - If the action is "mark", the todoId should be included and the status should be "done", "pending", or "archived".
         - If the action is "sort", the sortBy should be included.
         - If the action is "edit", both the todoId (to identify the todo to edit) and the text (the new content) should be included.
-        - If the action is "clear", the user wants to clear the list of todos with the given listToClear(all, completed, incomplete).
+        - If the action is "clear", the user wants to clear the list of todos with the given listToClear(all, done, pending).
         
         For the add action, the text should be in the future tense. like "buy groceries", "make a post with @theo", "go for violin lesson"
         ${emoji ? `Change the emoji to a more appropriate based on the text. The current emoji is: ${emoji}` : ""}
@@ -123,8 +123,8 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
         The todo list is very important to understand the user's intent.
         
         IMPORTANT: You must always use the todo's ID for the actions delete, mark, and edit. Do not use the text to identify todos.
-        Example: "todo id: '123abc', todo text: 'buy groceries', user request: 'bought groceries', action: 'mark', todoId: '123abc', status: 'complete'"
-        Example: "todo id: '456def', todo text: 'make a post with @theo', user request: 'i made a post with @theo', action: 'mark', todoId: '456def', status: 'complete'"
+        Example: "todo id: '123abc', todo text: 'buy groceries', user request: 'bought groceries', action: 'mark', todoId: '123abc', status: 'done'"
+        Example: "todo id: '456def', todo text: 'make a post with @theo', user request: 'i made a post with @theo', action: 'mark', todoId: '456def', status: 'done'"
         Example: "request: 'buy groceries today', action: 'add', text: 'buy groceries', emoji: '🛒', targetDate: '${todayStr}'"
         Example: "request: 'buy groceries tomorrow', action: 'add', text: 'buy groceries', emoji: '🛒', targetDate: '${tomorrowStr}'"
 
@@ -138,10 +138,10 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
 
         Example clear requests:
         "user request: 'clear all todos', action: 'clear', listToClear: 'all'"
-        "user request: 'clear my completed tasks', action: 'clear', listToClear: 'completed'"
-        "user request: 'remove all incomplete items', action: 'clear', listToClear: 'incomplete'"
+        "user request: 'clear my completed tasks', action: 'clear', listToClear: 'done'"
+        "user request: 'remove all incomplete items', action: 'clear', listToClear: 'pending'"
         "user request: 'start fresh', action: 'clear', listToClear: 'all'"
-        "user request: 'delete finished tasks', action: 'clear', listToClear: 'completed'"
+        "user request: 'delete finished tasks', action: 'clear', listToClear: 'done'"
         "user request: 'clean up my list', action: 'clear', listToClear: 'all'"
     `;
 
@@ -178,8 +178,8 @@ ${todos?.map(todo => `- ${todo.id}: ${todo.text} (${todo.emoji})`).join("\n")}
                 sortBy: z.enum(
                     ["newest", "oldest", "alphabetical", "completed"]
                 ).describe("The sort order").optional(),
-                status: z.enum(["complete", "incomplete"]).describe("The status of the todo item. to be used for the mark action").optional(),
-                listToClear: z.enum(["all", "completed", "incomplete"]).describe("The list to clear").optional(),
+                status: z.enum(["done", "pending", "archived"]).describe("The status of the todo item. to be used for the mark action").optional(),
+                listToClear: z.enum(["all", "done", "pending"]).describe("The list to clear").optional(),
             })),
         }),
         prompt,

@@ -143,13 +143,6 @@ export const Logs: RSModule = {
       };
     }
 
-    /**
-     * Gets the filename for a log ID
-     */
-    function getFilename(id: string): string {
-      return `${id}.json`;
-    }
-
     return {
       exports: {
         /**
@@ -169,9 +162,8 @@ export const Logs: RSModule = {
          * ```
          */
         add: async function (log: LogEntry): Promise<void> {
-          const filename = getFilename(log.id);
           const item = toLogStorageItem(log);
-          await privateClient.storeObject('log-entry', filename, item);
+          await privateClient.storeObject('log-entry', log.id, item);
         },
 
         /**
@@ -185,8 +177,7 @@ export const Logs: RSModule = {
           id: string,
           maxAge?: number
         ): Promise<LogEntry | null> {
-          const filename = getFilename(id);
-          const item = await privateClient.getObject(filename, maxAge);
+          const item = await privateClient.getObject(id, maxAge);
 
           if (!item || typeof item !== 'object' || !('action' in item)) {
             return null;
@@ -316,8 +307,7 @@ export const Logs: RSModule = {
          * @returns Promise that resolves when the log is removed
          */
         remove: async function (id: string): Promise<void> {
-          const filename = getFilename(id);
-          await privateClient.remove(filename);
+          await privateClient.remove(id);
         },
 
         /**

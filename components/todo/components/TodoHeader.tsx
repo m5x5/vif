@@ -26,8 +26,8 @@ export function TodoHeader({
     return {
       filteredTodos: filtered,
       progress: calculateProgress(filtered),
-      remainingCount: filtered.filter((todo) => !todo.completed).length,
-      completedCount: filtered.filter((todo) => todo.completed).length,
+      remainingCount: filtered.filter((todo) => todo.todo_item_status === "pending").length,
+      completedCount: filtered.filter((todo) => todo.todo_item_status === "done").length,
     };
   }, [todos, selectedDate]);
 

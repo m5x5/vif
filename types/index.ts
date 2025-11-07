@@ -1,7 +1,10 @@
+export type TodoItemStatus = "pending" | "done" | "archived";
+
 export interface TodoItem {
   id: string;
+  todo_item_id?: string; // Filename format: '${id}.json' (for compatibility with other programs)
   text: string;
-  completed: boolean;
+  todo_item_status: TodoItemStatus;
   emoji?: string;
   date: Date;
   time?: string; // Optional time in HH:mm format

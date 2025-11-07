@@ -23,8 +23,6 @@ import { useTodoStore, type ViewMode } from "@/stores/use-todo-store";
 import { useUIStore } from "@/stores/use-ui-store";
 
 export default function Todo() {
-  console.time("Time to todos");
-
   // Refs
   const inputRef = useRef<HTMLTextAreaElement>(null);
 

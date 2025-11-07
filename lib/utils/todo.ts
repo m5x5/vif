@@ -48,7 +48,9 @@ export const sortTodos = (todos: TodoItem[], sortBy: string) => {
       case "alphabetical":
         return a.text.localeCompare(b.text);
       case "completed":
-        return Number(b.completed) - Number(a.completed);
+        // Sort by status: done first, then pending, then archived
+        const statusOrder = { done: 2, pending: 1, archived: 0 };
+        return statusOrder[b.todo_item_status] - statusOrder[a.todo_item_status];
       default:
         return 0;
     }
@@ -57,7 +59,7 @@ export const sortTodos = (todos: TodoItem[], sortBy: string) => {
 
 // Calculate progress
 export const calculateProgress = (todos: TodoItem[]) => {
-  const completedCount = todos.filter((todo) => todo.completed).length;
+  const completedCount = todos.filter((todo) => todo.todo_item_status === "done").length;
   return todos.length > 0
     ? Math.round((completedCount / todos.length) * 100)
     : 0;

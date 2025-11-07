@@ -86,7 +86,7 @@ export function TodoItem({
     <div
       className={cn(
         "group flex items-start px-4 py-2.5 gap-3",
-        todo.completed ? "text-muted-foreground/50" : "hover:bg-muted/50",
+        todo.todo_item_status === "done" ? "text-muted-foreground/50" : "hover:bg-muted/50",
         isEditing && "bg-muted/80 rounded-lg",
         !isEditing && "cursor-pointer",
         "transition-colors"
@@ -199,10 +199,10 @@ export function TodoItem({
         <>
           <div onClick={(e: React.MouseEvent) => e.stopPropagation()} className="mt-0.5">
             <CircleCheckbox
-              checked={todo.completed}
+              checked={todo.todo_item_status === "done"}
               onCheckedChange={() => onToggle(todo.id)}
               className={cn(
-                todo.completed
+                todo.todo_item_status === "done"
                   ? "border-muted-foreground/50 bg-muted-foreground/20"
                   : "hover:border-muted-foreground/70"
               )}
@@ -228,7 +228,7 @@ export function TodoItem({
                     : todo.text.length > 30
                     ? "text-sm leading-relaxed"
                     : "text-[15px] leading-relaxed",
-                  todo.completed && "line-through"
+                  todo.todo_item_status === "done" && "line-through"
                 )}
               >
                 {todo.text}
