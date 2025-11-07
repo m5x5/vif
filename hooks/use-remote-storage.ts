@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import RemoteStorage from "remotestoragejs";
 import type { RSModule } from "remotestoragejs";
+import { Todonna } from "@/lib/remotestorage-todonna";
 
 // Singleton instance
 let remoteStorageInstance: RemoteStorage | null = null;
@@ -39,8 +40,10 @@ export function useRemoteStorage(options?: UseRemoteStorageOptions): RemoteStora
   useEffect(() => {
     // Create singleton instance if it doesn't exist
     if (!remoteStorageInstance) {
+      // Always include Todonna module by default
+      const modules = [Todonna, ...(options?.modules || [])];
       remoteStorageInstance = new RemoteStorage({
-        modules: options?.modules || []
+        modules
       });
       isInitialized = false;
       setInstance(remoteStorageInstance);

@@ -1,22 +1,26 @@
 import { TodoListProps } from "@/types";
 import { useState, useEffect } from "react";
 import { TodoItem } from "./TodoItem";
+import { useUIStore } from "@/stores/use-ui-store";
 
 export function TodoList({
   todos,
   onToggle,
   onDelete,
   onEdit,
-  editingTodoId,
-  editText,
-  editEmoji,
-  setEditText,
-  setEditEmoji,
   handleEditTodo,
   cancelEditing,
 }: TodoListProps) {
   const [isMobile, setIsMobile] = useState(false);
-  const [editTime, setEditTime] = useState<string>("");
+
+  // Get edit state from Zustand store
+  const editingTodoId = useUIStore((state) => state.editingTodoId);
+  const editText = useUIStore((state) => state.editText);
+  const editEmoji = useUIStore((state) => state.editEmoji);
+  const editTime = useUIStore((state) => state.editTime);
+  const setEditText = useUIStore((state) => state.setEditText);
+  const setEditEmoji = useUIStore((state) => state.setEditEmoji);
+  const setEditTime = useUIStore((state) => state.setEditTime);
 
   // Effect to detect mobile screens
   useEffect(() => {
@@ -35,7 +39,7 @@ export function TodoList({
       const todo = todos.find((t) => t.id === editingTodoId);
       setEditTime(todo?.time || "");
     }
-  }, [editingTodoId, todos]);
+  }, [editingTodoId, todos, setEditTime]);
 
   return (
     <>

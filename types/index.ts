@@ -20,11 +20,6 @@ export interface TodoListProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, text: string, emoji?: string) => void;
-  editingTodoId: string | null;
-  editText: string;
-  editEmoji: string;
-  setEditText: (text: string) => void;
-  setEditEmoji: (emoji: string) => void;
   handleEditTodo: (todo: TodoItem) => void;
   cancelEditing: () => void;
 }

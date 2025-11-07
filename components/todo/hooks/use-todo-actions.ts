@@ -4,15 +4,7 @@ import type RemoteStorage from "remotestoragejs";
 import { determineAction } from "@/app/actions";
 import { TodoItem, SortOption } from "@/types";
 import { serializeTodo } from "@/lib/utils/todo";
-
-interface TodonnaItem {
-  todo_item_text: string;
-  completed?: boolean;
-  emoji?: string;
-  date?: string;
-  time?: string;
-  [key: string]: any;
-}
+import { useUIStore } from "@/stores/use-ui-store";
 
 export interface UseTodoActionsProps {
   remoteStorage: RemoteStorage | null;
@@ -25,58 +17,26 @@ export function useTodoActions({
   selectedDate,
   apiKey,
 }: UseTodoActionsProps) {
-  // Todonna state
+  // State
   const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [isLoadingTodonna, setIsLoadingTodonna] = useState(true);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  
+  // Refs for managing async operations
   const isInitializedRef = useRef(false);
   const isSavingRef = useRef(false);
   const loadingRef = useRef(false);
 
-  // UI state
-  const [isLoading, setIsLoading] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [editEmoji, setEditEmoji] = useState("");
+  // UI state from Zustand store
+  const isLoading = useUIStore((state) => state.isLoading);
+  const isLoadingTodonna = useUIStore((state) => state.isLoadingTodonna);
+  const setIsLoading = useUIStore((state) => state.setIsLoading);
+  const setIsLoadingTodonna = useUIStore((state) => state.setIsLoadingTodonna);
+  const startEditingStore = useUIStore((state) => state.startEditing);
+  const cancelEditingStore = useUIStore((state) => state.cancelEditing);
 
   // Helper: Check if todo is on selected date
   const isOnSelectedDate = (todo: TodoItem) => {
     return format(todo.date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
-  };
-
-  // Helper: Reset edit state
-  const resetEditState = () => {
-    setEditingTodoId(null);
-    setEditText("");
-    setEditEmoji("");
-  };
-
-  // Helper: Find and update a todo
-  const findAndUpdateTodo = (id: string, updates: Partial<TodoItem>) => {
-    const todo = todos.find((t) => t.id === id);
-    if (todo) {
-      updateTodo({ ...todo, ...updates });
-    }
-  };
-
-  // Helper: Clear todos based on type
-  const clearTodosByType = (listToClear: "all" | "completed" | "incomplete") => {
-    let remaining: TodoItem[];
-
-    switch (listToClear) {
-      case "all":
-        remaining = todos.filter((todo) => !isOnSelectedDate(todo));
-        break;
-      case "completed":
-        remaining = todos.filter((todo) => !(todo.completed && isOnSelectedDate(todo)));
-        break;
-      case "incomplete":
-        remaining = todos.filter((todo) => !(!todo.completed && isOnSelectedDate(todo)));
-        break;
-    }
-
-    return remaining;
   };
 
   // Helper: Generate unique ID
@@ -99,85 +59,25 @@ export function useTodoActions({
     });
   };
 
-  const handleDeleteTodo = (id?: string) => {
-    if (!id) return;
-    findAndUpdateTodo(id, { removed: true });
-  };
+  // ========== Todonna Module Operations ==========
 
-  // Helper: Update a todo by ID with a transformer function
-  const updateTodoById = (
-    todos: TodoItem[],
-    todoId: string,
-    transformer: (todo: TodoItem) => TodoItem
-  ): TodoItem[] => {
-    return todos.map((todo) =>
-      todo.id === todoId ? transformer(todo) : todo
-    );
-  };
-
-  // ========== Todonna Storage Operations ==========
-
-  // Load todos from RemoteStorage
+  /**
+   * Load all todos from RemoteStorage using the Todonna module
+   */
   const loadTodos = useCallback(async () => {
-    console.time("loadTodos");
     if (!remoteStorage || loadingRef.current) return;
 
     loadingRef.current = true;
 
-    // Only show loading indicator for initial load or external reloads
+    // Only show loading indicator for initial load
     if (!isInitializedRef.current) {
       setIsLoadingTodonna(true);
     }
 
     try {
-      const client = remoteStorage.scope("/todonna/");
-      remoteStorage.caching.enable("/todonna/");
-      const listing = await client.getListing("", 1000 * 60 * 60 * 24);
+      // Use Todonna module API - much simpler!
+      const loadedTodos = await remoteStorage.todonna.getAll();
 
-      if (typeof listing !== "object" || !listing) {
-        setTodos([]);
-        isInitializedRef.current = true;
-        setIsLoadingTodonna(false);
-        return;
-      }
-
-      const filenames = Object.keys(listing as object);
-
-      // Fetch all files in parallel for better performance
-      const loadPromises = filenames.map(async (filename) => {
-        try {
-          const itemValue = await client.getObject(filename, 1000 * 60 * 60 * 24);
-
-          if (
-            typeof itemValue === "object" &&
-            itemValue !== null &&
-            "todo_item_text" in itemValue
-          ) {
-            const todonnaItem = itemValue as TodonnaItem;
-            const id = filename.replace(".json", "");
-
-            return serializeTodo({
-              id,
-              text: todonnaItem.todo_item_text,
-              completed: todonnaItem.completed || false,
-              emoji: todonnaItem.emoji,
-              date: todonnaItem.date ? new Date(todonnaItem.date) : new Date(),
-              time: todonnaItem.time,
-              removed: false,
-            });
-          }
-        } catch (error) {
-          console.error(`Failed to load todo ${filename}:`, error);
-        }
-        return null;
-      });
-
-      const results = await Promise.all(loadPromises);
-      const loadedTodos = results.filter(
-        (todo): todo is TodoItem => todo !== null
-      );
-
-      console.timeEnd("loadTodos");
       console.log(`Loaded ${loadedTodos.length} todos from RemoteStorage`);
       setTodos(loadedTodos);
       isInitializedRef.current = true;
@@ -190,32 +90,22 @@ export function useTodoActions({
     } finally {
       loadingRef.current = false;
     }
-  }, [remoteStorage]);
+  }, [remoteStorage, setIsLoadingTodonna]);
 
-  // Add a new todo
+  /**
+   * Add a new todo using the Todonna module
+   */
   const addTodo = useCallback(
     async (todo: TodoItem) => {
       if (!remoteStorage) return;
 
       isSavingRef.current = true;
       try {
-        // Optimistically update local state first (instant UI)
+        // Optimistically update local state
         setTodos((prev) => [...prev, serializeTodo(todo)]);
 
-        const client = remoteStorage.scope("/todonna/");
-        const filename = `${todo.id}.json`;
-
-        const todonnaItem: TodonnaItem = {
-          todo_item_text: todo.text,
-          completed: todo.completed,
-          emoji: todo.emoji,
-          date:
-            todo.date instanceof Date ? todo.date.toISOString() : todo.date,
-          time: todo.time,
-        };
-
-        const jsonString = JSON.stringify(todonnaItem);
-        await client.storeFile("application/json", filename, jsonString);
+        // Use Todonna module API
+        await remoteStorage.todonna.add(todo);
 
         console.log(`Added todo: ${todo.text}`);
       } catch (error) {
@@ -223,7 +113,6 @@ export function useTodoActions({
         // Rollback on error
         setTodos((prev) => prev.filter((t) => t.id !== todo.id));
       } finally {
-        // Wait a bit before allowing reloads
         setTimeout(() => {
           isSavingRef.current = false;
         }, 100);
@@ -232,7 +121,9 @@ export function useTodoActions({
     [remoteStorage]
   );
 
-  // Update an existing todo
+  /**
+   * Update an existing todo using the Todonna module
+   */
   const updateTodo = useCallback(
     async (todo: TodoItem) => {
       if (!remoteStorage) return;
@@ -241,25 +132,20 @@ export function useTodoActions({
       const previousTodos = todos;
 
       try {
-        // Optimistically update local state first (instant UI)
+        // Optimistically update local state
         setTodos((prev) =>
           prev.map((t) => (t.id === todo.id ? serializeTodo(todo) : t))
         );
 
-        const client = remoteStorage.scope("/todonna/");
-        const filename = `${todo.id}.json`;
-
-        const todonnaItem: TodonnaItem = {
-          todo_item_text: todo.text,
+        // Use Todonna module API
+        await remoteStorage.todonna.update(todo.id, {
+          text: todo.text,
           completed: todo.completed,
           emoji: todo.emoji,
-          date:
-            todo.date instanceof Date ? todo.date.toISOString() : todo.date,
+          date: todo.date,
           time: todo.time,
-        };
-
-        const jsonString = JSON.stringify(todonnaItem);
-        await client.storeFile("application/json", filename, jsonString);
+          removed: todo.removed,
+        });
 
         console.log(`Updated todo: ${todo.text}`);
       } catch (error) {
@@ -275,7 +161,36 @@ export function useTodoActions({
     [remoteStorage, todos]
   );
 
-  // Bulk update todos
+  /**
+   * Delete a todo (soft delete by marking as removed)
+   */
+  const handleDeleteTodo = useCallback(
+    (id?: string) => {
+      if (!id) return;
+      const todo = todos.find((t) => t.id === id);
+      if (todo) {
+        updateTodo({ ...todo, removed: true });
+      }
+    },
+    [todos, updateTodo]
+  );
+
+  /**
+   * Toggle todo completion status
+   */
+  const toggleTodo = useCallback(
+    (id: string) => {
+      const todo = todos.find((t) => t.id === id);
+      if (todo) {
+        updateTodo({ ...todo, completed: !todo.completed });
+      }
+    },
+    [todos, updateTodo]
+  );
+
+  /**
+   * Bulk update all todos using the Todonna module
+   */
   const setAllTodos = useCallback(
     async (newTodos: TodoItem[]) => {
       if (!remoteStorage) return;
@@ -284,56 +199,13 @@ export function useTodoActions({
       const previousTodos = todos;
 
       try {
-        // Optimistically update local state first (instant UI)
+        // Optimistically update local state
         setTodos(newTodos.filter((t) => !t.removed).map(serializeTodo));
 
-        const client = remoteStorage.scope("/todonna/");
-
-        // Get existing items
-        const listing = await client.getListing("");
-        const existingKeys = new Set(
-          typeof listing === "object" && listing
-            ? Object.keys(listing as object)
-            : []
+        // Use Todonna module's replaceAll for efficient bulk operations
+        await remoteStorage.todonna.replaceAll(
+          newTodos.filter((t) => !t.removed)
         );
-
-        const activeIds = new Set<string>();
-
-        // Prepare all save/update operations
-        const savePromises: Promise<any | string>[] = [];
-
-        // Save or update all todos in parallel
-        for (const todo of newTodos) {
-          if (todo.removed) continue;
-
-          const filename = `${todo.id}.json`;
-          activeIds.add(filename);
-
-          const todonnaItem: TodonnaItem = {
-            todo_item_text: todo.text,
-            completed: todo.completed,
-            emoji: todo.emoji,
-            date:
-              todo.date instanceof Date ? todo.date.toISOString() : todo.date,
-            time: todo.time,
-          };
-
-          const jsonString = JSON.stringify(todonnaItem);
-          savePromises.push(
-            client.storeFile("application/json", filename, jsonString)
-          );
-        }
-
-        // Delete removed todos in parallel
-        const deletePromises: Promise<any>[] = [];
-        for (const existingKey of existingKeys) {
-          if (!activeIds.has(existingKey)) {
-            deletePromises.push(client.remove(existingKey));
-          }
-        }
-
-        // Execute all operations in parallel
-        await Promise.all([...savePromises, ...deletePromises]);
 
         console.log(`Bulk updated ${newTodos.length} todos`);
       } catch (error) {
@@ -348,6 +220,213 @@ export function useTodoActions({
     },
     [remoteStorage, todos]
   );
+
+  /**
+   * Clear all todos for the selected date using Todonna module
+   */
+  const clearAllTodos = useCallback(async () => {
+    if (!remoteStorage) return;
+
+    isSavingRef.current = true;
+
+    try {
+      await remoteStorage.todonna.clearByDate(selectedDate);
+      // Reload to sync state
+      await loadTodos();
+    } catch (error) {
+      console.error("Failed to clear todos:", error);
+    } finally {
+      setTimeout(() => {
+        isSavingRef.current = false;
+      }, 100);
+    }
+  }, [remoteStorage, selectedDate, loadTodos]);
+
+  /**
+   * Clear completed todos for the selected date using Todonna module
+   */
+  const clearCompletedTodos = useCallback(async () => {
+    if (!remoteStorage) return;
+
+    isSavingRef.current = true;
+
+    try {
+      await remoteStorage.todonna.clearCompletedByDate(selectedDate);
+      // Reload to sync state
+      await loadTodos();
+    } catch (error) {
+      console.error("Failed to clear completed todos:", error);
+    } finally {
+      setTimeout(() => {
+        isSavingRef.current = false;
+      }, 100);
+    }
+  }, [remoteStorage, selectedDate, loadTodos]);
+
+  /**
+   * Clear incomplete todos for the selected date using Todonna module
+   */
+  const clearIncompleteTodos = useCallback(async () => {
+    if (!remoteStorage) return;
+
+    isSavingRef.current = true;
+
+    try {
+      await remoteStorage.todonna.clearIncompleteByDate(selectedDate);
+      // Reload to sync state
+      await loadTodos();
+    } catch (error) {
+      console.error("Failed to clear incomplete todos:", error);
+    } finally {
+      setTimeout(() => {
+        isSavingRef.current = false;
+      }, 100);
+    }
+  }, [remoteStorage, selectedDate, loadTodos]);
+
+  // ========== UI Action Handlers ==========
+
+  /**
+   * Handle natural language input and execute AI-determined actions
+   */
+  const handleAction = async (text: string, emoji: string) => {
+    if (!text.trim()) return;
+
+    setIsLoading(true);
+
+    let newTodos = [...todos];
+
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      // Filter todos for the selected date
+      const filteredTodos = todos.filter(
+        (todo) => isOnSelectedDate(todo) && !todo.removed
+      );
+
+      const actions = (
+        await determineAction(
+          text,
+          emoji || "",
+          filteredTodos,
+          "vif-openai",
+          timezone,
+          apiKey
+        )
+      ).actions;
+
+      for (const action of actions) {
+        switch (action.action) {
+          case "add":
+            const todoDate = action.targetDate
+              ? new Date(action.targetDate)
+              : selectedDate;
+            newTodos.push(
+              createTodo(
+                action.text || text,
+                action.emoji || emoji,
+                todoDate,
+                action.time
+              )
+            );
+            break;
+
+          case "delete":
+            if (action.todoId) {
+              handleDeleteTodo(action.todoId);
+            }
+            break;
+
+          case "mark":
+            if (action.todoId) {
+              newTodos = newTodos.map((todo) =>
+                todo.id === action.todoId
+                  ? {
+                      ...todo,
+                      completed:
+                        action.status === "complete"
+                          ? true
+                          : action.status === "incomplete"
+                          ? false
+                          : !todo.completed,
+                    }
+                  : todo
+              );
+            }
+            break;
+
+          case "sort":
+            if (action.sortBy) {
+              setSortBy(action.sortBy);
+            }
+            break;
+
+          case "edit":
+            if (action.todoId && action.text) {
+              const todo = todos.find((t) => t.id === action.todoId);
+              if (todo) {
+                const updated = serializeTodo({
+                  ...todo,
+                  text: action.text,
+                  emoji: action.emoji || todo.emoji,
+                  date: action.targetDate ? new Date(action.targetDate) : todo.date,
+                  time: action.time || todo.time,
+                  completed: action.status === "complete",
+                });
+                await updateTodo(updated);
+              }
+            }
+            break;
+
+          case "clear":
+            if (action.listToClear === "all") {
+              await clearAllTodos();
+            } else if (action.listToClear === "completed") {
+              await clearCompletedTodos();
+            } else if (action.listToClear === "incomplete") {
+              await clearIncompleteTodos();
+            }
+            break;
+        }
+      }
+
+      await setAllTodos(newTodos);
+    } catch (error) {
+      console.error("AI Action failed:", error);
+      await addTodo(createTodo(text, emoji));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Start editing a todo
+   */
+  const startEditing = (id: string, text: string, emoji?: string) => {
+    const todo = todos.find((t) => t.id === id);
+    startEditingStore(id, text, emoji || "", todo?.time || "");
+  };
+
+  /**
+   * Handle editing a todo
+   */
+  const handleEditTodo = (updatedTodo: TodoItem) => {
+    if (updatedTodo.text.trim()) {
+      const todo = todos.find((t) => t.id === updatedTodo.id);
+      if (todo) {
+        const updated = serializeTodo({
+          ...todo,
+          text: updatedTodo.text,
+          emoji: updatedTodo.emoji,
+          time: updatedTodo.time,
+        });
+        updateTodo(updated);
+      }
+    }
+    cancelEditingStore();
+  };
+
+  // ========== Effects ==========
 
   // Initial load and change listeners
   useEffect(() => {
@@ -377,177 +456,19 @@ export function useTodoActions({
     };
   }, [remoteStorage, loadTodos]);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // ========== Action Handlers ==========
-
-  const handleAction = async (text: string, emoji: string) => {
-    if (!text.trim()) return;
-
-    setIsLoading(true);
-
-    let newTodos = [...todos];
-
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      console.log("API Key:", apiKey);
-
-      // Filter todos for the selected date
-      const filteredTodos = todos.filter((todo) =>
-        isOnSelectedDate(todo) && !todo.removed
-      );
-
-      const actions = (
-        await determineAction(
-          text,
-          emoji || "",
-          filteredTodos,
-          "vif-openai", // Use OpenAI by default
-          timezone,
-          apiKey
-        )
-      ).actions;
-      actions.forEach((action) => {
-        switch (action.action) {
-          case "add":
-            const todoDate = action.targetDate
-              ? new Date(action.targetDate)
-              : selectedDate;
-            newTodos.push(
-              createTodo(
-                action.text || text,
-                action.emoji || emoji,
-                todoDate,
-                action.time
-              )
-            );
-            break;
-
-          case "delete":
-            handleDeleteTodo(action.todoId);
-            break;
-
-          case "mark":
-            if (action.todoId) {
-              newTodos = updateTodoById(newTodos, action.todoId, (todo) => {
-                const completed =
-                  action.status === "complete"
-                    ? true
-                    : action.status === "incomplete"
-                    ? false
-                    : !todo.completed;
-                return { ...todo, completed };
-              });
-            }
-            break;
-
-          case "sort":
-            if (action.sortBy) {
-              setSortBy(action.sortBy);
-            }
-            break;
-
-          case "edit":
-            if (!action.todoId || !action.text) return;
-
-            handleEditTodo({
-              id: action.todoId,
-              text: action.text,
-              completed: action.status === "complete" ? true : false,
-              emoji: action.emoji,
-              date: action.targetDate ? new Date(action.targetDate) : selectedDate,
-              time: action.time,
-            });
-            break;
-
-          case "clear":
-            if (action.listToClear) {
-              newTodos = clearTodosByType(action.listToClear);
-            }
-            break;
-        }
-      });
-
-      await setAllTodos(newTodos);
-    } catch (error) {
-      console.error("AI Action failed:", error);
-      await addTodo(createTodo(text, emoji));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const toggleTodo = (id: string) => {
-    const todo = todos.find((t) => t.id === id);
-    if (todo) {
-      updateTodo({ ...todo, completed: !todo.completed });
-    }
-  };
-
-  const startEditing = (id: string, text: string, emoji?: string) => {
-    setEditingTodoId(id);
-    setEditText(text);
-    setEditEmoji(emoji || "");
-  };
-
-  const cancelEditing = resetEditState;
-
-  const handleEditTodo = (updatedTodo: TodoItem) => {
-    if (updatedTodo.text.trim()) {
-      console.log("Editing todo:", updatedTodo);
-
-      const todo = todos.find((t) => t.id === updatedTodo.id);
-      if (todo) {
-        const updated = serializeTodo({
-          ...todo,
-          text: updatedTodo.text,
-          emoji: updatedTodo.emoji,
-          time: updatedTodo.time,
-        });
-        console.log("Updated todo:", updated);
-        updateTodo(updated);
-      }
-    }
-    resetEditState();
-  };
-
-  const clearAllTodos = () => {
-    setAllTodos(clearTodosByType("all"));
-  };
-
-  const clearCompletedTodos = () => {
-    setAllTodos(clearTodosByType("completed"));
-  };
-
-  const clearIncompleteTodos = () => {
-    setAllTodos(clearTodosByType("incomplete"));
-  };
-
   return {
-    // Todonna data
+    // Data
     todos,
     isLoadingTodonna,
     // UI state
     isLoading,
     sortBy,
     setSortBy,
-    editingTodoId,
-    editText,
-    editEmoji,
-    setEditText,
-    setEditEmoji,
     // Actions
     handleAction,
     toggleTodo,
     startEditing,
-    cancelEditing,
+    cancelEditing: cancelEditingStore,
     handleEditTodo,
     clearAllTodos,
     clearCompletedTodos,

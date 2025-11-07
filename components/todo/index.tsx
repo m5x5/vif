@@ -1,7 +1,8 @@
 "use client";
 
 import { AI } from "remotestorage-module-ai-wallet";
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useEffect, Suspense, useRef } from "react";
+import { format } from "date-fns";
 import { useRemoteStorage } from "@/hooks/use-remote-storage";
 import { sortTodos } from "@/lib/utils/todo";
 
@@ -13,18 +14,14 @@ import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 
 // Feature hooks
-import {
-  useClientHydration,
-  useDatesWithTodos,
-  useTodoActions,
-} from "./hooks";
+import { useClientHydration } from "./hooks";
+
+// Stores
+import { useTodoStore } from "@/stores/use-todo-store";
+import { useUIStore } from "@/stores/use-ui-store";
 
 export default function Todo() {
   console.time("Time to todos");
-
-  // UI State
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [apiKey, setApiKey] = useState<string>("");
 
   // Refs
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -39,6 +36,30 @@ export default function Todo() {
     apiKeys: { googledrive: "" },
   });
 
+  // Get state and actions from stores
+  const todos = useTodoStore((state) => state.todos);
+  const selectedDate = useTodoStore((state) => state.selectedDate);
+  const sortBy = useTodoStore((state) => state.sortBy);
+  const setSelectedDate = useTodoStore((state) => state.setSelectedDate);
+  const setRemoteStorage = useTodoStore((state) => state.setRemoteStorage);
+  const setApiKey = useTodoStore((state) => state.setApiKey);
+  const apiKey = useTodoStore((state) => state.apiKey);
+  const handleAction = useTodoStore((state) => state.handleAction);
+  const toggleTodo = useTodoStore((state) => state.toggleTodo);
+  const deleteTodo = useTodoStore((state) => state.deleteTodo);
+
+  const isLoadingTodonna = useUIStore((state) => state.isLoadingTodonna);
+  const isLoading = useUIStore((state) => state.isLoading);
+  const startEditing = useUIStore((state) => state.startEditing);
+  const cancelEditing = useUIStore((state) => state.cancelEditing);
+
+  // Initialize RemoteStorage in store
+  useEffect(() => {
+    if (remoteStorage) {
+      setRemoteStorage(remoteStorage);
+    }
+  }, [remoteStorage, setRemoteStorage]);
+
   // Fetch API key from RemoteStorage when available
   useEffect(() => {
     (remoteStorage as any)?.aiWallet
@@ -52,44 +73,9 @@ export default function Todo() {
       .catch((error: any) => {
         console.error("Failed to fetch API key from RemoteStorage:", error);
       });
-  }, [remoteStorage]);
+  }, [remoteStorage, setApiKey]);
 
-  // Unified todo actions hook (includes Todonna integration)
-  const {
-    todos,
-    isLoadingTodonna,
-    isLoading,
-    sortBy,
-    editingTodoId,
-    editText,
-    editEmoji,
-    setEditText,
-    setEditEmoji,
-    handleAction,
-    toggleTodo,
-    startEditing,
-    cancelEditing,
-    handleEditTodo,
-    handleDeleteTodo,
-  } = useTodoActions({
-    remoteStorage,
-    selectedDate,
-    apiKey,
-  });
-
-  // Get dates with todos for calendar highlighting
-  const datesWithTodos = useDatesWithTodos(todos);
-
-  // Handler that receives both text and emoji from TodoInputBar
-  const handleActionWithEmoji = (text: string, emoji: string) => {
-    handleAction(text, emoji);
-  };
-
-  const focusInput = () => {
-    inputRef.current?.focus();
-  };
-
-  // Filter and sort todos for display
+  // Compute values based on reactive state
   const filteredTodos = isClientLoaded
     ? todos.filter((todo) => {
         const todoDate = new Date(todo.date);
@@ -101,6 +87,35 @@ export default function Todo() {
     : [];
 
   const sortedTodos = isClientLoaded ? sortTodos(filteredTodos, sortBy) : [];
+
+  const datesWithTodos = new Set(
+    todos
+      .filter((todo) => !todo.removed)
+      .map((todo) => format(new Date(todo.date), 'yyyy-MM-dd'))
+  );
+
+  // Handler that receives both text and emoji from TodoInputBar
+  const handleActionWithEmoji = (text: string, emoji: string) => {
+    handleAction(text, emoji);
+  };
+
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
+  // Handle todo editing
+  const handleEditTodo = (updatedTodo: any) => {
+    const updateTodo = useTodoStore.getState().updateTodo;
+    if (updatedTodo.text.trim()) {
+      updateTodo(updatedTodo);
+    }
+    cancelEditing();
+  };
+
+  const handleStartEditing = (id: string, text: string, emoji?: string) => {
+    const todo = todos.find((t) => t.id === id);
+    startEditing(id, text, emoji || '', todo?.time || '');
+  };
 
   return (
     <div className="max-w-md w-full mx-auto p-4 space-y-4 pb-24 flex flex-col">
@@ -123,13 +138,8 @@ export default function Todo() {
             <TodoList
               todos={sortedTodos}
               onToggle={toggleTodo}
-              onDelete={handleDeleteTodo}
-              onEdit={startEditing}
-              editingTodoId={editingTodoId}
-              editText={editText}
-              editEmoji={editEmoji}
-              setEditText={setEditText}
-              setEditEmoji={setEditEmoji}
+              onDelete={deleteTodo}
+              onEdit={handleStartEditing}
               handleEditTodo={handleEditTodo}
               cancelEditing={cancelEditing}
             />
