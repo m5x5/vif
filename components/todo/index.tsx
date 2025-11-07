@@ -3,7 +3,6 @@
 import { AI } from "remotestorage-module-ai-wallet";
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useRemoteStorage } from "@/hooks/use-remote-storage";
-import { useTodonna } from "@/hooks/use-todonna";
 import { sortTodos } from "@/lib/utils/todo";
 
 // Feature components
@@ -55,18 +54,10 @@ export default function Todo() {
       });
   }, [remoteStorage]);
 
-  // Todonna integration
+  // Unified todo actions hook (includes Todonna integration)
   const {
     todos,
-    isLoading: isLoadingTodonna,
-    addTodo,
-    updateTodo,
-    deleteTodo,
-    setAllTodos,
-  } = useTodonna(remoteStorage);
-
-  // Todo actions hook (receives emoji from TodoInputBar via handleActionWithEmoji)
-  const {
+    isLoadingTodonna,
     isLoading,
     sortBy,
     editingTodoId,
@@ -79,14 +70,11 @@ export default function Todo() {
     startEditing,
     cancelEditing,
     handleEditTodo,
+    handleDeleteTodo,
   } = useTodoActions({
-    todos,
+    remoteStorage,
     selectedDate,
     apiKey,
-    addTodo,
-    updateTodo,
-    deleteTodo,
-    setAllTodos,
   });
 
   // Get dates with todos for calendar highlighting
@@ -135,7 +123,7 @@ export default function Todo() {
             <TodoList
               todos={sortedTodos}
               onToggle={toggleTodo}
-              onDelete={deleteTodo}
+              onDelete={handleDeleteTodo}
               onEdit={startEditing}
               editingTodoId={editingTodoId}
               editText={editText}
