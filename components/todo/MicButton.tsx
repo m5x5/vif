@@ -24,7 +24,7 @@ export function MicButton({
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10"
+        className="h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10"
         disabled={true}
       >
         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -38,7 +38,7 @@ export function MicButton({
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10 group relative"
+        className="h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10 group relative"
         onClick={() => {
           alert(
             "Microphone access is blocked. To enable voice input:\n\n1. Click the lock/site settings icon in your browser's address bar\n2. Allow microphone access\n3. Refresh this page"
@@ -60,7 +60,7 @@ export function MicButton({
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10"
+        className="h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10 hover:bg-primary/10"
         onClick={onSend}
         disabled={isProcessingSpeech}
       >
@@ -75,7 +75,7 @@ export function MicButton({
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10"
+        className="h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10"
         onClick={stopRecording}
         disabled={isProcessingSpeech}
       >
@@ -93,8 +93,8 @@ export function MicButton({
       variant="ghost"
       size="icon"
       className={cn(
-        "h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10",
-        micPermission === "granted" && "text-green-500 hover:text-green-600"
+        "h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10",
+        micPermission === "granted" && "hover:bg-primary/10"
       )}
       onClick={startRecording}
       disabled={isProcessingSpeech}

@@ -12,12 +12,14 @@ import { TodoSkeleton } from "./TodoSkeleton";
 import { TodoList } from "./TodoList";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
+import { Sidebar } from "./Sidebar";
+import { ArchiveView } from "./ArchiveView";
 
 // Feature hooks
 import { useClientHydration } from "./hooks";
 
 // Stores
-import { useTodoStore } from "@/stores/use-todo-store";
+import { useTodoStore, type ViewMode } from "@/stores/use-todo-store";
 import { useUIStore } from "@/stores/use-ui-store";
 
 export default function Todo() {
@@ -29,10 +31,10 @@ export default function Todo() {
   // Custom hooks
   const isClientLoaded = useClientHydration();
 
-  // RemoteStorage for both AI wallet and Todonna
+  // RemoteStorage for both AI wallet, Todonna, and Logs
   const remoteStorage = useRemoteStorage({
     modules: [AI],
-    accessClaims: { "ai-wallet": "rw", "todonna": "rw" },
+    accessClaims: { "ai-wallet": "rw", "todonna": "rw", "logs": "rw" },
     apiKeys: { googledrive: "" },
   });
 
@@ -40,13 +42,17 @@ export default function Todo() {
   const todos = useTodoStore((state) => state.todos);
   const selectedDate = useTodoStore((state) => state.selectedDate);
   const sortBy = useTodoStore((state) => state.sortBy);
+  const viewMode = useTodoStore((state) => state.viewMode);
   const setSelectedDate = useTodoStore((state) => state.setSelectedDate);
+  const setViewMode = useTodoStore((state) => state.setViewMode);
   const setRemoteStorage = useTodoStore((state) => state.setRemoteStorage);
   const setApiKey = useTodoStore((state) => state.setApiKey);
   const apiKey = useTodoStore((state) => state.apiKey);
   const handleAction = useTodoStore((state) => state.handleAction);
   const toggleTodo = useTodoStore((state) => state.toggleTodo);
   const deleteTodo = useTodoStore((state) => state.deleteTodo);
+  const unarchiveTodo = useTodoStore((state) => state.unarchiveTodo);
+  const getArchivedTodos = useTodoStore((state) => state.getArchivedTodos);
 
   const isLoadingTodonna = useUIStore((state) => state.isLoadingTodonna);
   const isLoading = useUIStore((state) => state.isLoading);
@@ -79,10 +85,13 @@ export default function Todo() {
   const filteredTodos = isClientLoaded
     ? todos.filter((todo) => {
         const todoDate = new Date(todo.date);
-        return (
-          todoDate.toDateString() === selectedDate.toDateString() &&
-          !todo.removed
-        );
+        const dateMatches = todoDate.toDateString() === selectedDate.toDateString();
+        
+        if (viewMode === 'archive') {
+          return dateMatches && todo.removed === true;
+        }
+        
+        return dateMatches && !todo.removed;
       })
     : [];
 
@@ -117,42 +126,84 @@ export default function Todo() {
     startEditing(id, text, emoji || '', todo?.time || '');
   };
 
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const handleUnarchive = (id: string) => {
+    unarchiveTodo(id).catch((error) => {
+      console.error('Failed to unarchive todo:', error);
+    });
+  };
+
+  const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+
   return (
-    <div className="max-w-md w-full mx-auto p-4 space-y-4 pb-24 flex flex-col">
-      <TodoHeader
-        selectedDate={selectedDate}
-        todos={todos}
-        datesWithTodos={datesWithTodos}
-        onDateChange={setSelectedDate}
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <Sidebar 
+        viewMode={viewMode} 
+        onViewModeChange={handleViewModeChange}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
       />
+      
+      {/* Main Content */}
+      <div className="flex-1 max-w-md w-full mx-auto p-4 space-y-4 pb-24 flex flex-col">
+        <TodoHeader
+          selectedDate={selectedDate}
+          todos={todos}
+          datesWithTodos={datesWithTodos}
+          onDateChange={handleDateChange}
+        />
 
-      <div className="-mx-4">
-        <Suspense fallback={<TodoSkeleton />}>
-          {!isClientLoaded || isLoadingTodonna ? (
-            <LoadingState />
-          ) : sortedTodos.length === 0 && isLoading ? (
-            <LoadingState />
-          ) : sortedTodos.length === 0 && !isLoading ? (
-            <EmptyState selectedDate={selectedDate} focusInput={focusInput} />
-          ) : (
-            <TodoList
-              todos={sortedTodos}
-              onToggle={toggleTodo}
-              onDelete={deleteTodo}
-              onEdit={handleStartEditing}
-              handleEditTodo={handleEditTodo}
-              cancelEditing={cancelEditing}
-            />
-          )}
-        </Suspense>
+        <div className="-mx-4">
+          <Suspense fallback={<TodoSkeleton />}>
+            {!isClientLoaded || isLoadingTodonna ? (
+              <LoadingState />
+            ) : viewMode === 'archive' ? (
+              <ArchiveView
+                todos={getArchivedTodos()}
+                sortBy={sortBy}
+                selectedDate={selectedDate}
+                onToggle={toggleTodo}
+                onDelete={deleteTodo}
+                onUnarchive={handleUnarchive}
+                onEdit={handleStartEditing}
+                handleEditTodo={handleEditTodo}
+                cancelEditing={cancelEditing}
+              />
+            ) : sortedTodos.length === 0 && isLoading ? (
+              <LoadingState />
+            ) : sortedTodos.length === 0 && !isLoading ? (
+              <EmptyState selectedDate={selectedDate} focusInput={focusInput} />
+            ) : (
+              <TodoList
+                todos={sortedTodos}
+                onToggle={toggleTodo}
+                onDelete={deleteTodo}
+                onEdit={handleStartEditing}
+                handleEditTodo={handleEditTodo}
+                cancelEditing={cancelEditing}
+              />
+            )}
+          </Suspense>
+        </div>
+
+        {viewMode === 'daily' && (
+          <TodoInputBar
+            isLoading={isLoading}
+            apiKey={apiKey}
+            onAction={handleActionWithEmoji}
+            inputRef={inputRef}
+          />
+        )}
       </div>
-
-      <TodoInputBar
-        isLoading={isLoading}
-        apiKey={apiKey}
-        onAction={handleActionWithEmoji}
-        inputRef={inputRef}
-      />
     </div>
   );
 }

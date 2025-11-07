@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import RemoteStorage from "remotestoragejs";
 import type { RSModule } from "remotestoragejs";
 import { Todonna } from "@/lib/remotestorage-todonna";
+import { Logs } from "@/lib/remotestorage-logs";
 
 // Singleton instance
 let remoteStorageInstance: RemoteStorage | null = null;
@@ -40,8 +41,8 @@ export function useRemoteStorage(options?: UseRemoteStorageOptions): RemoteStora
   useEffect(() => {
     // Create singleton instance if it doesn't exist
     if (!remoteStorageInstance) {
-      // Always include Todonna module by default
-      const modules = [Todonna, ...(options?.modules || [])];
+      // Always include Todonna and Logs modules by default
+      const modules = [Todonna, Logs, ...(options?.modules || [])];
       remoteStorageInstance = new RemoteStorage({
         modules
       });
@@ -54,9 +55,10 @@ export function useRemoteStorage(options?: UseRemoteStorageOptions): RemoteStora
       remoteStorageInstance.setApiKeys(options.apiKeys);
     }
 
-    // Default access claims - always claim todonna and ai-wallet
+    // Default access claims - always claim todonna, logs, and ai-wallet
     const defaultClaims = {
       'todonna': 'rw' as const,
+      'logs': 'rw' as const,
       'ai-wallet': 'rw' as const,
       ...(options?.accessClaims || {})
     };
@@ -67,8 +69,9 @@ export function useRemoteStorage(options?: UseRemoteStorageOptions): RemoteStora
         remoteStorageInstance!.access.claim(module, mode);
       });
 
-      // Enable caching for todonna
+      // Enable caching for todonna, logs, and ai-wallet
       remoteStorageInstance.caching.enable("/todonna/");
+      remoteStorageInstance.caching.enable("/logs/");
       remoteStorageInstance.caching.enable("/ai-wallet/");
 
       hasClaimedAccess.current = true;

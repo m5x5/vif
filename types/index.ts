@@ -19,6 +19,7 @@ export interface TodoListProps {
   todos: TodoItem[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onUnarchive?: (id: string) => void;
   onEdit: (id: string, text: string, emoji?: string) => void;
   handleEditTodo: (todo: TodoItem) => void;
   cancelEditing: () => void;

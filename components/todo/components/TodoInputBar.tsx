@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { InputLoadingIndicator } from "../InputLoadingIndicator";
@@ -28,6 +28,7 @@ export function TodoInputBar({
   const [selectedEmoji, setSelectedEmoji] = useState<string>("😊");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showFaqDialog, setShowFaqDialog] = useState(false);
+  const [hasUsedApp, setHasUsedApp] = useState(false);
 
   // Device detection
   const isMobile = useMobileDetection();
@@ -38,12 +39,30 @@ export function TodoInputBar({
   const { isRecording, isProcessingSpeech, startRecording, stopRecording } =
     useSpeechRecognition(apiKey);
 
+  // Check if user has used the app before
+  useEffect(() => {
+    const hasUsed = localStorage.getItem("vif-has-used");
+    setHasUsedApp(!!hasUsed);
+  }, []);
+
+  // Mark app as used when first action is performed
+  const markAppAsUsed = () => {
+    if (!hasUsedApp) {
+      localStorage.setItem("vif-has-used", "true");
+      setHasUsedApp(true);
+    }
+  };
+
   // Event handlers
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !isLoading) {
       e.preventDefault();
-      onAction(newTodo, selectedEmoji);
-      setNewTodo("");
+      const trimmedText = newTodo.trim();
+      if (trimmedText) {
+        onAction(trimmedText, selectedEmoji);
+        setNewTodo("");
+        markAppAsUsed();
+      }
     }
   };
 
@@ -51,14 +70,20 @@ export function TodoInputBar({
     if (isRecording) {
       const text = await stopRecording();
       if (text) {
-        setNewTodo(text);
+        // Auto-send after voice recording
+        onAction(text, selectedEmoji);
+        markAppAsUsed();
       }
     }
   };
 
   const handleSendAction = () => {
-    onAction(newTodo, selectedEmoji);
-    setNewTodo("");
+    const trimmedText = newTodo.trim();
+    if (trimmedText) {
+      onAction(trimmedText, selectedEmoji);
+      setNewTodo("");
+      markAppAsUsed();
+    }
   };
 
   return (
@@ -69,37 +94,37 @@ export function TodoInputBar({
         isInputFocused && "pb-4"
       )}
     >
-      <div className="max-w-md mx-auto flex items-center space-x-2">
+      <div className="max-w-md mx-auto flex items-center gap-2">
         <MenuDropdown />
 
-        <div className="flex-1 flex items-start bg-muted/80 rounded-lg overflow-hidden">
+        <div className="flex-1 flex items-center bg-muted/80 rounded-lg overflow-hidden min-h-[44px]">
           <EmojiSelector
             selectedEmoji={selectedEmoji}
             isLoading={isLoading}
             onEmojiSelect={setSelectedEmoji}
           />
 
-          <Textarea
-            ref={inputRef}
-            placeholder={
-              isLoading ? "Processing..." : "insert or send action"
-            }
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-            autoResize
-            rows={1}
-            className={cn(
-              "flex-1 border-0 !bg-transparent focus:!outline-none focus:!ring-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 min-h-[60px] max-h-[200px] rounded-none shadow-none px-2 py-2.5",
-              isLoading && "text-muted-foreground"
+          <div className="flex-1 flex items-center min-h-[44px]">
+            {isLoading || isProcessingSpeech ? (
+              <InputLoadingIndicator showText={!isProcessingSpeech} />
+            ) : (
+              <Textarea
+                ref={inputRef}
+                placeholder="add task or action"
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
+                autoResize
+                rows={1}
+                className={cn(
+                  "flex-1 border-0 !bg-transparent focus:!outline-none focus:!ring-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 min-h-[44px] max-h-[200px] rounded-none shadow-none px-3 py-2 resize-none leading-normal"
+                )}
+                disabled={isLoading || isProcessingSpeech}
+              />
             )}
-            disabled={isLoading || isProcessingSpeech}
-          />
-
-          {isLoading && <InputLoadingIndicator showText={true} />}
-          {isProcessingSpeech && <InputLoadingIndicator />}
+          </div>
 
           <MicButton
             isRecording={isRecording}
@@ -112,13 +137,15 @@ export function TodoInputBar({
           />
         </div>
 
-        <HelpDialog
-          isMobile={isMobile}
-          showFaqDialog={showFaqDialog}
-          isLoading={isLoading}
-          isProcessingSpeech={isProcessingSpeech}
-          onFaqDialogChange={setShowFaqDialog}
-        />
+        {!hasUsedApp && (
+          <HelpDialog
+            isMobile={isMobile}
+            showFaqDialog={showFaqDialog}
+            isLoading={isLoading}
+            isProcessingSpeech={isProcessingSpeech}
+            onFaqDialogChange={setShowFaqDialog}
+          />
+        )}
       </div>
     </div>
   );

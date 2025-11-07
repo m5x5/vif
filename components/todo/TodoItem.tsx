@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PencilSimple, Check, Smiley, Clock, XIcon } from "@phosphor-icons/react";
+import { PencilSimple, Check, Smiley, Clock, XIcon, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { CircleCheckbox } from "./CircleCheckbox";
 import { TodoItem as TodoItemType } from "@/types";
 import { useRef, useEffect } from "react";
@@ -27,6 +27,7 @@ export interface TodoItemProps {
   isMobile: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onUnarchive?: (id: string) => void;
   onEdit: (id: string, text: string, emoji?: string) => void;
   setEditText: (text: string) => void;
   setEditEmoji: (emoji: string) => void;
@@ -44,6 +45,7 @@ export function TodoItem({
   isMobile,
   onToggle,
   onDelete,
+  onUnarchive,
   onEdit,
   setEditText,
   setEditEmoji,
@@ -71,6 +73,13 @@ export function TodoItem({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(todo.id);
+  };
+
+  const handleUnarchive = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onUnarchive) {
+      onUnarchive(todo.id);
+    }
   };
 
   return (
@@ -248,6 +257,22 @@ export function TodoItem({
           >
             <PencilSimple className="w-4 h-4" weight="bold" />
           </Button>
+          {onUnarchive && todo.removed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-7 w-7 text-muted-foreground hover:text-primary",
+                isMobile
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 transition-opacity"
+              )}
+              onClick={handleUnarchive}
+              title="Unarchive"
+            >
+              <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

@@ -7,6 +7,7 @@ export function TodoList({
   todos,
   onToggle,
   onDelete,
+  onUnarchive,
   onEdit,
   handleEditTodo,
   cancelEditing,
@@ -54,6 +55,7 @@ export function TodoList({
           isMobile={isMobile}
           onToggle={onToggle}
           onDelete={onDelete}
+          onUnarchive={onUnarchive}
           onEdit={onEdit}
           setEditText={setEditText}
           setEditEmoji={setEditEmoji}

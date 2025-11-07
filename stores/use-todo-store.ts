@@ -5,12 +5,16 @@ import { TodoItem, SortOption } from '@/types';
 import { serializeTodo, sortTodos } from '@/lib/utils/todo';
 import { determineAction } from '@/app/actions';
 import { useUIStore } from './use-ui-store';
+import { logAction, logTodoAction, LogActions } from '@/lib/utils/logging';
+
+export type ViewMode = 'daily' | 'archive';
 
 interface TodoStore {
   // State
   todos: TodoItem[];
   selectedDate: Date;
   sortBy: SortOption;
+  viewMode: ViewMode;
 
   // RemoteStorage config
   remoteStorage: RemoteStorage | null;
@@ -26,11 +30,13 @@ interface TodoStore {
   setApiKey: (key: string) => void;
   setSelectedDate: (date: Date) => void;
   setSortBy: (option: SortOption) => void;
+  setViewMode: (mode: ViewMode) => void;
 
   // Todo CRUD operations
   addTodo: (todo: TodoItem) => Promise<void>;
   updateTodo: (todo: TodoItem) => Promise<void>;
   deleteTodo: (id: string) => void;
+  unarchiveTodo: (id: string) => Promise<void>;
   toggleTodo: (id: string) => void;
   setAllTodos: (todos: TodoItem[]) => Promise<void>;
 
@@ -49,6 +55,7 @@ interface TodoStore {
   getTodosForDate: (date?: Date) => TodoItem[];
   getSortedTodos: (date?: Date) => TodoItem[];
   getDatesWithTodos: () => Set<string>;
+  getArchivedTodos: () => TodoItem[];
 }
 
 export const useTodoStore = create<TodoStore>((set, get) => ({
@@ -56,6 +63,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
   todos: [],
   selectedDate: new Date(),
   sortBy: 'newest',
+  viewMode: 'daily',
   remoteStorage: null,
   apiKey: '',
   isInitialized: false,
@@ -83,9 +91,28 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
   setApiKey: (key) => set({ apiKey: key }),
 
-  setSelectedDate: (date) => set({ selectedDate: date }),
+  setSelectedDate: async (date) => {
+    const { remoteStorage } = get();
+    set({ selectedDate: date });
+    // Log date change
+    await logAction(remoteStorage, LogActions.CHANGE_DATE, {
+      date: date.toISOString(),
+    });
+  },
 
-  setSortBy: (option) => set({ sortBy: option }),
+  setSortBy: async (option) => {
+    const { remoteStorage } = get();
+    set({ sortBy: option });
+    // Log sort change
+    await logAction(remoteStorage, LogActions.CHANGE_SORT, { sortBy: option });
+  },
+
+  setViewMode: async (mode) => {
+    const { remoteStorage } = get();
+    set({ viewMode: mode });
+    // Log view change
+    await logAction(remoteStorage, LogActions.CHANGE_VIEW, { viewMode: mode });
+  },
 
   // Load todos from RemoteStorage using Todonna module
   loadTodos: async () => {
@@ -129,6 +156,14 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
       // Use Todonna module API
       await remoteStorage.todonna.add(todo);
 
+      // Log the action
+      await logTodoAction(remoteStorage, LogActions.ADD_TODO, todo.id, {
+        text: todo.text,
+        emoji: todo.emoji,
+        date: todo.date.toISOString(),
+        time: todo.time,
+      });
+
       console.log(`Added todo: ${todo.text}`);
     } catch (error) {
       console.error('Failed to add todo:', error);
@@ -163,6 +198,16 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         removed: todo.removed,
       });
 
+      // Log the action
+      await logTodoAction(remoteStorage, LogActions.UPDATE_TODO, todo.id, {
+        text: todo.text,
+        completed: todo.completed,
+        emoji: todo.emoji,
+        date: todo.date.toISOString(),
+        time: todo.time,
+        removed: todo.removed,
+      });
+
       console.log(`Updated todo: ${todo.text}`);
     } catch (error) {
       console.error('Failed to update todo:', error);
@@ -174,18 +219,43 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
   },
 
   // Delete a todo (soft delete by updating with removed flag)
-  deleteTodo: (id: string) => {
+  deleteTodo: async (id: string) => {
+    const { remoteStorage } = get();
     const todo = get().todos.find((t) => t.id === id);
     if (todo) {
-      get().updateTodo({ ...todo, removed: true });
+      await get().updateTodo({ ...todo, removed: true });
+      // Log the delete action
+      await logTodoAction(remoteStorage, LogActions.DELETE_TODO, id, {
+        text: todo.text,
+      });
+    }
+  },
+
+  // Unarchive a todo (restore by updating with removed flag set to false)
+  unarchiveTodo: async (id: string) => {
+    const { remoteStorage } = get();
+    const todo = get().todos.find((t) => t.id === id);
+    if (todo) {
+      await get().updateTodo({ ...todo, removed: false });
+      // Log the unarchive action
+      await logTodoAction(remoteStorage, LogActions.UNARCHIVE_TODO, id, {
+        text: todo.text,
+      });
     }
   },
 
   // Toggle todo completion
-  toggleTodo: (id: string) => {
+  toggleTodo: async (id: string) => {
+    const { remoteStorage } = get();
     const todo = get().todos.find((t) => t.id === id);
     if (todo) {
-      get().updateTodo({ ...todo, completed: !todo.completed });
+      const newCompleted = !todo.completed;
+      await get().updateTodo({ ...todo, completed: newCompleted });
+      // Log the toggle action
+      await logTodoAction(remoteStorage, LogActions.TOGGLE_TODO, id, {
+        completed: newCompleted,
+        text: todo.text,
+      });
     }
   },
 
@@ -223,6 +293,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
     try {
       await remoteStorage.todonna.clearByDate(selectedDate);
+      // Log the action
+      await logAction(remoteStorage, LogActions.CLEAR_ALL_TODOS, {
+        date: selectedDate.toISOString(),
+      });
       // Reload to sync state
       await get().loadTodos();
     } catch (error) {
@@ -240,6 +314,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
     try {
       await remoteStorage.todonna.clearCompletedByDate(selectedDate);
+      // Log the action
+      await logAction(remoteStorage, LogActions.CLEAR_COMPLETED_TODOS, {
+        date: selectedDate.toISOString(),
+      });
       // Reload to sync state
       await get().loadTodos();
     } catch (error) {
@@ -257,6 +335,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
     try {
       await remoteStorage.todonna.clearIncompleteByDate(selectedDate);
+      // Log the action
+      await logAction(remoteStorage, LogActions.CLEAR_INCOMPLETE_TODOS, {
+        date: selectedDate.toISOString(),
+      });
       // Reload to sync state
       await get().loadTodos();
     } catch (error) {
@@ -270,7 +352,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
   handleAction: async (text: string, emoji: string) => {
     if (!text.trim()) return;
 
-    const { todos, selectedDate, apiKey } = get();
+    const { todos, selectedDate, apiKey, remoteStorage } = get();
 
     useUIStore.getState().setIsLoading(true);
 
@@ -376,8 +458,21 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
       }
 
       await get().setAllTodos(newTodos);
+      
+      // Log successful AI action
+      await logAction(remoteStorage, LogActions.AI_ACTION, {
+        text,
+        emoji,
+        actionCount: actions.length,
+        actions: actions.map(a => a.action),
+      });
     } catch (error) {
       console.error('AI Action failed:', error);
+      // Log failed AI action
+      await logAction(remoteStorage, LogActions.AI_ACTION_FAILED, {
+        text,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Fallback: just add the todo as-is
       const fallbackTodo = serializeTodo({
         id: Math.random().toString(36).substring(7),
@@ -394,16 +489,33 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
   // Selectors
   getTodosForDate: (date?: Date) => {
-    const { todos, selectedDate } = get();
+    const { todos, selectedDate, viewMode } = get();
     const targetDate = date || selectedDate;
 
     return todos.filter((todo) => {
       const todoDate = new Date(todo.date);
-      return (
-        todoDate.toDateString() === targetDate.toDateString() &&
-        !todo.removed
-      );
+      const dateMatches = todoDate.toDateString() === targetDate.toDateString();
+      
+      if (viewMode === 'archive') {
+        return dateMatches && todo.removed === true;
+      }
+      
+      return dateMatches && !todo.removed;
     });
+  },
+  
+  getArchivedTodos: () => {
+    const { todos } = get();
+    // Get all archived todos, sort by date (newest first), and limit to 50
+    return todos
+      .filter((todo) => todo.removed === true)
+      .sort((a, b) => {
+        // Sort by date, most recent first
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 50);
   },
 
   getSortedTodos: (date?: Date) => {

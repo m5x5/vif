@@ -25,11 +25,11 @@ export function EmojiSelector({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0 rounded-none hover:bg-muted-foreground/10"
+          className="h-11 w-11 shrink-0 rounded-none hover:bg-muted-foreground/10"
           disabled={isLoading}
         >
           {selectedEmoji ? (
-            <span>{selectedEmoji}</span>
+            <span className="text-lg">{selectedEmoji}</span>
           ) : (
             <Smiley
               className="w-5 h-5 text-muted-foreground"

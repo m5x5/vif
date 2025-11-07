@@ -11,6 +11,9 @@ interface UIStore {
   isLoading: boolean;
   isLoadingTodonna: boolean;
 
+  // Sidebar state
+  isSidebarCollapsed: boolean;
+
   // Edit actions
   startEditing: (id: string, text: string, emoji?: string, time?: string) => void;
   setEditText: (text: string) => void;
@@ -21,6 +24,10 @@ interface UIStore {
   // Loading actions
   setIsLoading: (loading: boolean) => void;
   setIsLoadingTodonna: (loading: boolean) => void;
+
+  // Sidebar actions
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -31,6 +38,7 @@ export const useUIStore = create<UIStore>((set) => ({
   editTime: '',
   isLoading: false,
   isLoadingTodonna: true,
+  isSidebarCollapsed: true, // Collapsed by default
 
   // Edit actions
   startEditing: (id: string, text: string, emoji?: string, time?: string) =>
@@ -59,4 +67,9 @@ export const useUIStore = create<UIStore>((set) => ({
   setIsLoading: (loading: boolean) => set({ isLoading: loading }),
 
   setIsLoadingTodonna: (loading: boolean) => set({ isLoadingTodonna: loading }),
+
+  // Sidebar actions
+  toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+
+  setSidebarCollapsed: (collapsed: boolean) => set({ isSidebarCollapsed: collapsed }),
 }));
